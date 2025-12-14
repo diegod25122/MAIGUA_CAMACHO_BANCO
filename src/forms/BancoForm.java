@@ -72,9 +72,8 @@ public class BancoForm extends JFrame {
         btnTrans.addActionListener(e -> transferir());
         btnSalir.addActionListener(e -> System.exit(0));
 
-        // -------------------------
+
         // DISEÑO CON GROUPLAYOUT
-        // -------------------------
 
         JPanel panel = new JPanel();
         GroupLayout layout = new GroupLayout(panel);
