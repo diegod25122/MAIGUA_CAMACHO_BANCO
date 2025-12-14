@@ -7,13 +7,13 @@ import javax.swing.*;
 import db.Conexion;
 import java.sql.*;
 
-public class LoginForm extends JFrame {
+public class Loginform extends JFrame {
 
     private JTextField txtUsuario;
     private JPasswordField txtClave;
     private JButton btnIngresar;
 
-    public LoginForm() {
+    public Loginform() {
         setTitle("Inicio de Sesión");
         setSize(320, 180);
         setLocationRelativeTo(null);

@@ -7,7 +7,7 @@ public class Conexion {
 
     private static final String URL = "jdbc:mysql://localhost:3306/banco_db";
     private static final String USER = "root";
-    private static final String PASS = "root"; // cambia esto
+    private static final String PASS = "root";
 
     public static Connection getConexion() {
         try {
