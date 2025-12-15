@@ -10,7 +10,7 @@ import java.awt.*;
 public class BancoForm extends JFrame {
 
     private String cliente;
-    private double saldo = 1000.00;
+    private double saldo;
 
     private JLabel lblSaldo;
     private JTextArea historial;
@@ -24,6 +24,7 @@ public class BancoForm extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         initComponents();
+        cargarSaldo();
     }
 
     private void initComponents() {
@@ -36,8 +37,10 @@ public class BancoForm extends JFrame {
         JLabel lblCliente = new JLabel("Cliente: " + cliente);
         lblCliente.setFont(tituloFont);
 
-        lblSaldo = new JLabel("Saldo actual: $" + saldo);
+
+        lblSaldo = new JLabel("Saldo actual: $0.00");
         lblSaldo.setFont(textoFont);
+
 
         // HISTORIAL ESTILIZADO
         historial = new JTextArea();
@@ -119,6 +122,30 @@ public class BancoForm extends JFrame {
         );
 
         add(panel);
+    }
+    private void cargarSaldo() {
+        try {
+            Connection cn = db.Conexion.getConexion();
+
+            if (cn == null) {
+                JOptionPane.showMessageDialog(this, "No se pudo conectar a la BD");
+                return;
+            }
+
+            String sql = "SELECT saldo FROM cuentas WHERE username=?";
+            PreparedStatement ps = cn.prepareStatement(sql);
+            ps.setString(1, cliente);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                saldo = rs.getDouble("saldo");
+                actualizarSaldo();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void actualizarSaldo() {
