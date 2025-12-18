@@ -37,10 +37,8 @@ public class BancoForm extends JFrame {
         JLabel lblCliente = new JLabel("Cliente: " + cliente);
         lblCliente.setFont(tituloFont);
 
-
         lblSaldo = new JLabel("Saldo actual: $0.00");
         lblSaldo.setFont(textoFont);
-
 
         // HISTORIAL ESTILIZADO
         historial = new JTextArea();
@@ -75,9 +73,7 @@ public class BancoForm extends JFrame {
         btnTrans.addActionListener(e -> transferir());
         btnSalir.addActionListener(e -> System.exit(0));
 
-
         // DISEÑO CON GROUPLAYOUT
-
         JPanel panel = new JPanel();
         GroupLayout layout = new GroupLayout(panel);
         panel.setLayout(layout);
@@ -123,6 +119,7 @@ public class BancoForm extends JFrame {
 
         add(panel);
     }
+
     private void cargarSaldo() {
         try {
             Connection cn = db.Conexion.getConexion();
@@ -133,7 +130,7 @@ public class BancoForm extends JFrame {
             }
 
             String sql = "SELECT saldo FROM cuentas WHERE username=?";
-            PreparedStatement ps = cn.prepareStatement(sql);
+            PreparedStatement ps = cn.prepareStatement(sql); //Se creó un preparedStament para  tener una conexion mas segura a la base de datos
             ps.setString(1, cliente);
 
             ResultSet rs = ps.executeQuery();
@@ -149,62 +146,236 @@ public class BancoForm extends JFrame {
     }
 
     private void actualizarSaldo() {
-        lblSaldo.setText("Saldo actual: $" + saldo);
+        lblSaldo.setText("Saldo actual: $" + String.format("%.2f", saldo));
+
+        // Cambiar color según el saldo
+        if (saldo < 500) {
+            lblSaldo.setForeground(new Color(231, 76, 60)); // Rojo
+        } else if (saldo < 2000) {
+            lblSaldo.setForeground(new Color(230, 126, 34)); // Naranja
+        } else {
+            lblSaldo.setForeground(new Color(46, 204, 113)); // Verde
+        }
     }
 
     private void agregarHistorial(String texto) {
         historial.append(texto + "\n");
     }
 
+    // MÉTODO DEPOSITAR MEJORADO
     private void depositar() {
         String input = JOptionPane.showInputDialog(this, "Monto a depositar:");
-        if (input == null) return;
+
+        // Validar que no canceló
+        if (input == null || input.trim().isEmpty()) return;
+
         try {
             double monto = Double.parseDouble(input);
+
+            // Validación: monto debe ser positivo
+            if (monto <= 0) {
+                JOptionPane.showMessageDialog(this,
+                        "El monto debe ser mayor a cero.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Validación: máximo $10,000 por depósito
+            if (monto > 10000) {
+                JOptionPane.showMessageDialog(this,
+                        "El monto máximo por depósito es $10,000",
+                        "Error",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Realizar depósito
             saldo += monto;
-            agregarHistorial("Depósito: +$" + monto);
+            actualizarSaldoDB();
+            agregarHistorial("✓ Depósito: +$" + String.format("%.2f", monto));
             actualizarSaldo();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Número inválido.");
+
+            JOptionPane.showMessageDialog(this,
+                    "Depósito exitoso.\nNuevo saldo: $" + String.format("%.2f", saldo),
+                    "Éxito",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Por favor ingrese un número válido.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // MÉTODO RETIRAR MEJORADO
     private void retirar() {
         String input = JOptionPane.showInputDialog(this, "Monto a retirar:");
-        if (input == null) return;
+
+        if (input == null || input.trim().isEmpty()) return;
+
         try {
             double monto = Double.parseDouble(input);
-            if (monto <= saldo) {
-                saldo -= monto;
-                agregarHistorial("Retiro: -$" + monto);
-                actualizarSaldo();
-            } else {
-                JOptionPane.showMessageDialog(this, "Saldo insuficiente.");
+
+            // Validación: monto positivo
+            if (monto <= 0) {
+                JOptionPane.showMessageDialog(this,
+                        "El monto debe ser mayor a cero.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
             }
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Número inválido.");
+
+            // Validación: saldo mínimo de $100
+            if (saldo - monto < 100) {
+                JOptionPane.showMessageDialog(this,
+                        "Debe mantener un saldo mínimo de $100.\n" +
+                                "Saldo actual: $" + String.format("%.2f", saldo) + "\n" +
+                                "Saldo disponible para retirar: $" + String.format("%.2f", saldo - 100),
+                        "Error",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Validación: saldo suficiente
+            if (monto > saldo) {
+                JOptionPane.showMessageDialog(this,
+                        "Saldo insuficiente.\n" +
+                                "Saldo actual: $" + String.format("%.2f", saldo) + "\n" +
+                                "Monto solicitado: $" + String.format("%.2f", monto),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Realizar retiro
+            saldo -= monto;
+            actualizarSaldoDB();
+            agregarHistorial("✓ Retiro: -$" + String.format("%.2f", monto));
+            actualizarSaldo();
+
+            JOptionPane.showMessageDialog(this,
+                    "Retiro exitoso.\nNuevo saldo: $" + String.format("%.2f", saldo),
+                    "Éxito",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Por favor ingrese un número válido.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // MÉTODO TRANSFERIR MEJORADO
     private void transferir() {
-        String dest = JOptionPane.showInputDialog(this, "Destinatario:");
-        if (dest == null) return;
+        String dest = JOptionPane.showInputDialog(this, "Nombre del destinatario:");
+
+        if (dest == null || dest.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Debe ingresar un destinatario válido.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Validación: no transferir a sí mismo
+        if (dest.trim().equalsIgnoreCase(cliente)) {
+            JOptionPane.showMessageDialog(this,
+                    "No puede transferir a su propia cuenta.",
+                    "Error",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         String input = JOptionPane.showInputDialog(this, "Monto a transferir:");
-        if (input == null) return;
+
+        if (input == null || input.trim().isEmpty()) return;
 
         try {
             double monto = Double.parseDouble(input);
-            if (monto <= saldo) {
-                saldo -= monto;
-                agregarHistorial("Transferencia a " + dest + ": -$" + monto);
-                JOptionPane.showMessageDialog(this, "Transferencia exitosa.");
-                actualizarSaldo();
-            } else {
-                JOptionPane.showMessageDialog(this, "Saldo insuficiente.");
+
+            // Validación: monto positivo
+            if (monto <= 0) {
+                JOptionPane.showMessageDialog(this,
+                        "El monto debe ser mayor a cero.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
             }
+
+            // Calcular comisión del 2%
+            double comision = monto * 0.02;
+            double totalCobrar = monto + comision;
+
+            // Validación: saldo suficiente incluyendo comisión
+            if (totalCobrar > saldo) {
+                JOptionPane.showMessageDialog(this,
+                        "Saldo insuficiente.\n" +
+                                "Monto a transferir: $" + String.format("%.2f", monto) + "\n" +
+                                "Comisión (2%): $" + String.format("%.2f", comision) + "\n" +
+                                "Total requerido: $" + String.format("%.2f", totalCobrar) + "\n" +
+                                "Saldo actual: $" + String.format("%.2f", saldo),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Confirmar transferencia
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "¿Confirmar transferencia?\n\n" +
+                            "Destinatario: " + dest + "\n" +
+                            "Monto: $" + String.format("%.2f", monto) + "\n" +
+                            "Comisión: $" + String.format("%.2f", comision) + "\n" +
+                            "Total a debitar: $" + String.format("%.2f", totalCobrar),
+                    "Confirmar",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE);
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                // Realizar transferencia
+                saldo -= totalCobrar;
+                actualizarSaldoDB();
+                agregarHistorial("✓ Transferencia a " + dest + ": -$" + String.format("%.2f", monto));
+                agregarHistorial("  Comisión: -$" + String.format("%.2f", comision));
+                actualizarSaldo();
+
+                JOptionPane.showMessageDialog(this,
+                        "Transferencia exitosa.\nNuevo saldo: $" + String.format("%.2f", saldo),
+                        "Éxito",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Por favor ingrese un número válido.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // MÉTODO PARA ACTUALIZAR SALDO EN BASE DE DATOS
+    private void actualizarSaldoDB() {
+        try {
+            Connection cn = db.Conexion.getConexion();
+
+            if (cn == null) {
+                JOptionPane.showMessageDialog(this,
+                        "Error al conectar con la base de datos.");
+                return;
+            }
+
+            String sql = "UPDATE cuentas SET saldo=? WHERE username=?";
+            PreparedStatement ps = cn.prepareStatement(sql);
+            ps.setDouble(1, saldo);
+            ps.setString(2, cliente);
+            ps.executeUpdate();
+
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Monto inválido.");
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                    "Error al actualizar saldo en la base de datos.");
         }
     }
 }
